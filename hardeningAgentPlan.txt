@@ -1,0 +1,394 @@
+Before leaving Module 1
+
+Do not start Module 2 until your work machine proves:
+
+- A real POST /scan is accepted.
+- The response returns a valid job_id and access token.
+- GET /status/ works with that token.
+- A completed run downloads a valid ZIP.
+- You have confirmed the accepted optional fields using the deployed OpenAPI schema.
+- Corporate TLS works without disabling verification.
+- Tokens do not appear in logs, .env, fixtures, or artifacts.
+
+Module 1 is the external scanner client. It is not yet the agent.
+
+-------------------------------------------------------------------------------
+RECOMMENDED IMPLEMENTATION MODULES
+-------------------------------------------------------------------------------
+
+These are proposed Implementation_modules packages, not replacements for the numbered chunks in the main roadmap.
+
+===============================================================================
+PHASE 1: TURN EZ-SCAN OUTPUT INTO A USEFUL PLAN
+===============================================================================
+
+Module: module_02_ez_scan_cli_and_run_records
+
+Capability:
+Replace the pytest smoke test as the primary interface with an operator command that submits, waits, downloads, and creates a run directory with safe metadata and hashes.
+
+Why it comes here:
+Module 1 proves the API, but you need a repeatable operator experience and somewhere to store evidence.
+
+Completion test:
+Fake lifecycle passes, one real scan downloads a ZIP, and no access token appears in output or run records.
+
+-------------------------------------------------------------------------------
+
+Module: module_03_ez_scan_result_ingestion
+
+Capability:
+Safely inspect results.zip, reject unsafe ZIP entries, select the workbook, and convert rows into normalized findings.
+
+Why it comes here:
+The system cannot reason about a ZIP; it needs stable JSON findings.
+
+Completion test:
+A sanitized fixture produces deterministic CVE, package, severity, image, worksheet, and row evidence.
+
+-------------------------------------------------------------------------------
+
+Module: module_04_sbom_and_service_classification
+
+Capability:
+Load or generate an SBOM, determine package ecosystem and ownership, and map each finding to a configured service.
+
+Why it comes here:
+Before proposing changes, the system must know whether a finding belongs to Python, Node, Java, an OS layer, or is unresolved.
+
+Completion test:
+Every fixture finding becomes application-owned, OS/base-image-owned, unmapped, or explicitly unresolved.
+
+-------------------------------------------------------------------------------
+
+Module: module_05_read_only_planner
+
+Capability:
+Produce normalized-findings.json, plan.json, and a readable plan summary without changing source.
+
+Why it comes here:
+This is the first genuinely useful safety milestone: real scanner evidence becomes an explainable remediation plan.
+
+Completion test:
+Every finding has a disposition and evidence trail; the source repository remains unchanged.
+
+Core data models introduced here should include:
+
+- RunManifest
+- ArtifactReference
+- NormalizedFinding
+- ScanEvidence
+- ServiceConfig
+- ClassifiedFinding
+- PlanAction
+- PlanDocument
+
+The mature reference seams are:
+
+- ingest.py
+- classifier.py
+- planner.py
+
+At the end of Module 5, you have a safe read-only product:
+
+EZ-Scan
+    ↓
+results.zip
+    ↓
+normalized findings
+    ↓
+service mapping
+    ↓
+remediation plan
+
+===============================================================================
+PHASE 2: ESTABLISH MUTATION SAFETY
+===============================================================================
+
+Module: module_06_safe_apply_envelope
+
+Capability:
+Create an isolated Git worktree, enforce protected paths and diff budgets, and initially use only a fake patcher.
+
+Why it comes here:
+Mutation infrastructure must be proven before adding a real dependency editor.
+
+Completion test:
+The fake patch changes only the review worktree; blocked and plan-only actions cannot mutate; replay is idempotent.
+
+-------------------------------------------------------------------------------
+
+Module: module_07_langgraph_approvals_and_resume
+
+Capability:
+Add checkpointed run state, SQLite persistence, approval interrupts, resume, hash validation, and idempotent replay.
+
+Why it comes here:
+Every later agentic or approval-dependent workflow needs one shared continuation mechanism.
+
+Completion test:
+An action pauses and resumes using the same run ID; stale, rejected, expired, or mismatched approval cannot mutate.
+
+-------------------------------------------------------------------------------
+
+Module: module_08_immutable_targets
+
+Capability:
+Resolve source to an exact commit and images to an exact digest; record provenance and enforce source/image capability rules.
+
+Why it comes here:
+The system must know exactly what source and image it is changing and scanning.
+
+Completion test:
+Mutable tags become digests, provenance mismatch blocks mutation, and generated overlays are digest-pinned.
+
+Important distinction:
+
+Module 7 makes the workflow agentic in its control flow—state, branching, approvals, retries, and resume—but it still does not need an LLM.
+
+The mature references are:
+
+- apply.py
+- targets.py
+- workflow/runtime.py
+
+===============================================================================
+PHASE 3: COMPLETE ONE REAL REMEDIATION LOOP
+===============================================================================
+
+Module: module_09_python_dependency_adapter
+
+Capability:
+Update pinned requirements, constraints, and pyproject.toml; use native tools for pip-tools, Poetry, or uv lockfiles.
+
+Why it comes here:
+Python is the smallest practical ecosystem for proving real mutation.
+
+Completion test:
+A fixture dependency changes correctly, a second application is a no-op, and lockfiles are never text-edited.
+
+-------------------------------------------------------------------------------
+
+Module: module_10_node_dependency_adapter
+
+Capability:
+Handle package.json, overrides, and npm/Yarn/pnpm lockfiles.
+
+Why it comes here:
+It reuses the adapter framework while adding transitive-owner and lockfile cases.
+
+Completion test:
+Direct and evidenced transitive fixes work; ambiguous ownership remains report-only.
+
+-------------------------------------------------------------------------------
+
+Module: module_11_java_dependency_adapter
+
+Capability:
+Handle Maven properties, parents, BOMs, dependency management, Gradle constraints, and version catalogs.
+
+Why it comes here:
+Java is last because determining the owning version declaration is substantially harder.
+
+Completion test:
+The owning declaration changes; ambiguous transitive findings never cause a guessed edit.
+
+-------------------------------------------------------------------------------
+
+Module: module_12_verification_ladder
+
+Capability:
+Run dependency resolution, image build, container smoke test, and service tests in cost order.
+
+Why it comes here:
+A syntactically correct patch is not a successful remediation until it builds and runs.
+
+Completion test:
+The ladder stops at the failed rung, scrubs logs, resumes safely, and can retry only that rung.
+
+-------------------------------------------------------------------------------
+
+Module: module_13_local_proxy_scanning
+
+Capability:
+Add optional Trivy/Grype scans, SBOM generation, baseline/final comparison, scan budgets, and regression gates.
+
+Why it comes here:
+Fast local scanning reduces unnecessary authoritative EZ-Scan submissions.
+
+Completion test:
+A new High/Critical finding blocks completion, and the report clearly calls this proxy—not authoritative—evidence.
+
+-------------------------------------------------------------------------------
+
+Module: module_14_authoritative_ez_scan_integration
+
+Capability:
+Adapt Module 1 into the run graph: submit the rebuilt image, pause/poll, retrieve the ZIP, ingest it, and compare before versus after.
+
+Why it comes here:
+This closes the complete hardening loop using the real authority.
+
+Completion test:
+One run links plan, patch, verification, final EZ-Scan workbook, comparison, and clearance decision under the same run ID.
+
+Module 14 has an important design issue:
+
+The direct API token must survive a paused workflow if polling happens in another process. Do not store it in ordinary artifacts.
+
+Use either:
+
+- One process for submit → wait → download
+- A work-approved secret provider for resumable jobs
+
+The staged direct client and the existing Jenkins-oriented backend have different contracts. Module 14 should add an adapter between them rather than overwrite either implementation.
+
+After Module 14, you have the first full MVP:
+
+Real finding
+    ↓
+Deterministic plan
+    ↓
+Approved isolated patch
+    ↓
+Build and tests
+    ↓
+Authoritative rescan
+    ↓
+Before/after report
+
+If your first real work service is Node or Java rather than Python, you can move that ecosystem ahead of Module 9.
+
+Keep the safety, approval, and verification modules in the same order.
+
+===============================================================================
+PHASE 4: ADD BOUNDED INTELLIGENCE
+===============================================================================
+
+Module: module_15_source_usage_audit
+
+Capability:
+Use Python AST and Tree-sitter for Node/Java to find imports, references, call sites, and unused dependencies.
+
+Why it comes here:
+Removal, replacement, and feature work require evidence about actual source usage.
+
+Completion test:
+Direct, aliased, and subpath use is detected; dynamic or incomplete analysis never becomes "unused."
+
+-------------------------------------------------------------------------------
+
+Module: module_16_structured_model_boundary
+
+Capability:
+Define provider-neutral model transport, strict structured outputs, scrubbed context, model-call budgets, and a fake model.
+
+Why it comes here:
+The deterministic validators and evidence now exist to constrain model behavior.
+
+Completion test:
+Invalid JSON, invented files, oversized output, and unsupported operations fail closed.
+
+-------------------------------------------------------------------------------
+
+Module: module_17_bounded_repair_agent
+
+Capability:
+Classify build failures, try deterministic playbooks, ask a model only on a miss, validate its proposal, request approval, apply, and retry the failed rung.
+
+Why it comes here:
+This is the first place model reasoning materially helps without controlling the system.
+
+Completion test:
+Known failures use zero model calls; a seeded unknown failure uses the fake model; repeated failures stop with a handoff report.
+
+For model providers, implement in this order:
+
+1. FakeModelTransport for all tests.
+2. A provider-neutral interface with strict Pydantic output.
+3. One company-approved provider, such as your approved Bedrock deployment or approved OpenAI-compatible gateway.
+4. An optional second provider only after the first is operational.
+
+Keep exact model IDs in configuration.
+
+The model should never receive:
+
+- Shell access
+- Credentials
+- Policy control
+- Approval authority
+- Retry-budget control
+- Permission to apply its own patch
+
+The model proposes.
+Deterministic code validates.
+Policy decides.
+A human approves.
+The workflow applies.
+
+===============================================================================
+PHASE 5: EXPAND INTO RISKIER REMEDIATION
+===============================================================================
+
+Module: module_18_os_and_base_image_remediation
+
+Capability:
+Gather package/capability evidence and evaluate remove → replace → patch → mitigate → justify.
+
+Why it comes here:
+OS changes require image provenance, usage evidence, builds, scans, and approvals.
+
+Completion test:
+A systemd-style fixture distinguishes removable packages from required runtime capabilities; every mutation requires approval.
+
+-------------------------------------------------------------------------------
+
+Module: module_19_reduction_and_maintenance
+
+Capability:
+Add unused-dependency reduction, dependency freshness, and reviewed core-library replacement knowledge.
+
+Why it comes here:
+Replacement decisions need usage evidence and sometimes bounded source migration.
+
+Completion test:
+Reduction and maintenance remain read-only by default; weak test coverage or unsupported APIs block migration.
+
+-------------------------------------------------------------------------------
+
+Module: module_20_feature_assessment
+
+Capability:
+Accept an explicit compliance directive, perform a deterministic census, request a bounded model map, validate it, and report blast radius.
+
+Why it comes here:
+Feature removal should begin with a separate read-only assessment.
+
+Completion test:
+Model-invented files or symbols are rejected; insufficient evidence remains explicit.
+
+-------------------------------------------------------------------------------
+
+Module: module_21_feature_removal
+
+Capability:
+Require footprint approval and diff approval, mutate in isolation, verify keep/negative checks, rescan, guard against reintroduction, and roll back on failure.
+
+Why it comes here:
+This is the broadest source mutation and therefore belongs near the end.
+
+Completion test:
+Changed evidence invalidates approval, adjacent features still work, and a seeded reintroduction fails the guard.
+
+-------------------------------------------------------------------------------
+
+Module: module_22_pr_and_enterprise_operations
+
+Capability:
+Produce deterministic commits and PR-ready summaries, optional approved PR publication, trusted external approvals, and explicit batch selection.
+
+Why it comes here:
+External publication should consume a fully proven run rather than participate in remediation reasoning.
+
+Completion test:
+Artifact-only publication works offline, optional PR publication never auto-merges, and no endpoints or credentials appear in source or artifacts.
